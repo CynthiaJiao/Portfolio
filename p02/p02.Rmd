@@ -104,7 +104,7 @@ ggplot(as.data.frame(table(thesis_partial$`Age (CALCULATED FROM PREVIOUS COLUMNS
   scale_fill_manual(values = c("6" = "#fbd163", "7" = "#89c4ff", "8" = "#90a16a", "9" = "#c3beef", "10" = "#fdbcbc")) 
 
 ```
-From the table and pie chart, there are 11 Asian (20%), 4 Latinx/Hispanic (7.3%), 5 Multiracial (9.1%),and 35 White (63.6%) children who participated in the study.
+From the table and pie chart, there are 11 Asian (20%), 3 Black (5.2%), 4 Latinx/Hispanic (7.3%), 5 Multiracial (9.1%),and 35 White (63.6%) children who participated in the study.
 ```{r demographic info - race}
 
 ## demographic breakdown for participants - race
@@ -120,6 +120,7 @@ thesis_partial <- thesis_partial %>%
       Race %in% c("W, H") ~ "Latinx/Hispanic",  # Mark W, H as Latinx/Hispanic
       Race == "W" ~ "White",  # Mark W as White
       Race == "A" ~ "Asian",  # Mark A as Asian
+      Race == "B" ~ "Black", # Mark B as Black
       Race == "Chose not to respond" ~ "Choose not to respond",  # Keep as is
       TRUE ~ NA_character_  # If none of the conditions match, assign NA
     )
@@ -138,6 +139,6 @@ ggplot(as.data.frame(table(thesis_partial$RaceCategory)), aes(x = "", y = Freq, 
   ggtitle("Participant Race Distribution") +
   geom_text(aes(label = paste0(round(Freq / sum(Freq) * 100, 1), "%")), 
             position = position_stack(vjust = 0.5)) +
-  scale_fill_manual(values = c("White" = "#fbd163", "Asian" = "#89c4ff", "Latinx/Hispanic" = "#90a16a", "Multiracial" = "#c3beef", "Choose not to respond" = "#fdbcbc")) 
+  scale_fill_manual(values = c("White" = "#fbd163", "Black" = "#fdbcbc", "Asian" = "#89c4ff", "Latinx/Hispanic" = "#90a16a", "Multiracial" = "#c3beef", "Choose not to respond" = "#fdbcbc")) 
 
 ```
