@@ -403,21 +403,5 @@ ggplot(plot_data, aes(x = targetGender, y = emmean, fill = targetRace)) +
   coord_cartesian(ylim = c(0, 4))  # Adjust y-axis limits as needed
 
 
-## line graphs
-
-ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targetRace, group = targetRace)) +
-  stat_summary(fun = mean, geom = "line", size = 1) +
-  stat_summary(fun = mean, geom = "point", size = 3) +
-  scale_color_manual(
-    values = c("White" = "#8CD790", "Black" = "#F5A65B", "Asian" = "#7D9EC0"),
-    name = "Target Race"
-  ) +
-  labs(
-    x = "Stereotype Dimension",
-    y = "Choice Score",
-    title = "Interaction: Target Race x Target Gender x Stereotype Dimension"
-  ) +
-  theme_minimal()
-
 ```
 
