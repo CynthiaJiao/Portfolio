@@ -1,0 +1,409 @@
+---
+title: "Portfolio 4"
+author: "Cynthia Jiao"
+date: "2025-3-22"
+---
+
+Hey Mason, I did not run the core analysis model for p03, because there was a model fitting issue... I wanted to make sure that I could solve them/safely ignore them before I proceed to interpret the results. After a week of work of Katharine and I, we still did not solve the fitting issue, but we think it's safe to ignore the warning message, so here are all my core (pre-registered) analysis as well as the graphs of effect
+
+
+### Set up & clean the data
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(lme4)
+library(car)
+library(emmeans)
+library(effectsize)
+library(irr)
+library(tidycensus)
+library(lme4)
+```
+
+```{r, echo = F}
+
+qualtrics <-read.csv("Cynthia Thesis_March 5, 2025_11.29.csv")
+
+## cleaning the data by PID
+
+qualtrics <- qualtrics %>% 
+  select(-c(StartDate, EndDate, Status, IPAddress, Progress, Duration..in.seconds., RecordedDate, ResponseId, RecipientFirstName, RecipientLastName, RecipientEmail, ExternalReference, LocationLatitude, LocationLongitude, DistributionChannel, UserLanguage)) %>%
+  mutate(PID = as.numeric(PID)) %>%
+  arrange(PID) %>%
+  filter(!is.na(PID))
+
+## loading the data sheet from Google sheets
+
+sheets <-read_excel("Intersectional Stereotypes Data.xlsx")
+
+sheets <- sheets %>%
+  filter(!is.na(PID)) %>%
+  mutate(PID = as.numeric(PID))
+
+## merging two data set by PID
+
+thesis <- full_join(qualtrics, sheets, by = "PID")
+
+## excluding the duplicated PID with empty Qualtrics responses
+
+##TODO: remove remove this line for full data
+
+## Identify PIDs that appear more than once
+
+# duplicate_pids <- thesis %>%
+#   count(PID) %>%
+#   filter(n > 1) %>%
+#   pull(PID) ##TODO: remove remove this line for full data
+
+thesis <- thesis %>%
+  filter(!is.na(smart_screener1))
+
+## exclude the excluded participants
+
+thesis <- thesis %>%
+  filter(exclude %in% c("no", "no; half data"))
+
+
+```
+
+```{r, echo = F}
+
+## creating a composite score for each social group being selected
+
+## manually specify column names for smart and nice selections
+
+smart_cols <- c("S1_1", "S1_2", "S1_3", "S1_4", "S1_5", "S1_6", "S1_7", 
+                "S1_8", "S1_9", "S1_10", "S1_11", "S1_12", "S1_13", "S1_14", "S1_15", "S2_1", "S2_2", "S2_3", "S2_4", "S2_5", "S2_6", "S2_7", 
+                "S2_8", "S2_9", "S2_10", "S2_11", "S2_12", "S2_13", "S2_14", "S2_15")
+
+nice_cols <- c("N1_1", "N1_2", "N1_3", "N1_4", "N1_5", "N1_6", "N1_7", 
+               "N1_8", "N1_9", "N1_10", "N1_11", "N1_12", "N1_13", "N1_14", "N1_15", "N2_1", "N2_2", "N2_3", "N2_4", "N2_5", "N2_6", "N2_7", 
+               "N2_8", "N2_9", "N2_10", "N2_11", "N2_12", "N2_13", "N2_14", "N2_15")
+
+## create a function to count the numbers of each social group being selected
+
+count_selections <- function(data, cols) {
+  data %>%
+    select(PID, all_of(cols)) %>%
+    mutate(CompletedVersion = ifelse(rowSums(!is.na(select(., starts_with("S1")))) > 0, "S1", "S2")) %>%
+    pivot_longer(cols = -c(PID, CompletedVersion), names_to = "Question", values_to = "Selection") %>%
+    filter(!is.na(Selection) & Selection != "") %>%  # Remove unassigned version (empty values)
+    group_by(PID, Selection) %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    pivot_wider(names_from = Selection, values_from = Count, values_fill = list(Count = 0))
+}
+
+## process smart and nice data separately
+
+smart_counts <- count_selections(thesis, smart_cols)
+nice_counts <- count_selections(thesis, nice_cols)
+
+
+```
+
+```{r, echo = F}
+
+# Add stereotype dimension label
+smart_long <- smart_counts %>%
+  mutate(stereotype_dimension = "Smart") %>%
+  pivot_longer(cols = -c(PID, stereotype_dimension), names_to = "targetGroup", values_to = "choice_score")
+
+nice_long <- nice_counts %>%
+  mutate(stereotype_dimension = "Nice") %>%
+  pivot_longer(cols = -c(PID, stereotype_dimension), names_to = "targetGroup", values_to = "choice_score")
+
+# Combine into one dataset
+thesis_long <- bind_rows(smart_long, nice_long)
+
+
+```
+
+```{r, echo = F}
+
+# Extract targetGender and targetRace from "targetGroup" column
+
+thesis_long <- thesis_long %>%
+  mutate(targetGender = case_when(grepl(" man", targetGroup) ~ "Man", ##### here was the bug!!!!! fixed by adding a space in front of "man", because grepl might recognize "woman" as "man" because "woman" has "man" string too!!
+                                  grepl("woman", targetGroup) ~ "Woman")) %>% 
+  mutate(targetRace = case_when(
+           grepl("Black", targetGroup) ~ "Black",
+           grepl("White", targetGroup) ~ "White",
+           grepl("Asian", targetGroup) ~ "Asian"
+         ))
+
+```
+
+### Descriptive statistics by groups
+```{r, echo = F}
+# Descriptive statistics
+
+thesis_long %>%
+  group_by(stereotype_dimension, targetGroup) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+thesis_long %>%
+  group_by(targetGender) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+thesis_long %>%
+  group_by(targetGender, stereotype_dimension) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+thesis_long %>%
+  group_by(targetRace) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+thesis_long %>%
+  group_by(targetRace, targetGender) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+thesis_long %>%
+  group_by(stereotype_dimension) %>%
+  summarise(meanChoice = mean(choice_score), sdChoice = sd(choice_score))
+
+```
+
+From the descriptive statistic table, it seems that White targets (woman and man) have the mean score that are in between the scores of Asian and Black targets, so for the target race variable in lmer model, we are going to use White as a reference group and code as 0. 
+
+```{r, echo = F}
+### Center and recode variables for analysis
+
+## center target gender predictor  
+
+thesis_long$targetGenderC <- dplyr::recode(thesis_long$targetGender, 
+                       "Man" = -.5,
+                       "Woman" = .5)
+
+# Two contrasts for 3-level factor:
+
+# Let's start with white people as the race reference group given that we know that children from most racial backgrounds show a bias favoring white people
+thesis_long$whiteBlack <- dplyr::recode(thesis_long$targetRace, 
+                       "White" = 0,
+                       "Asian" = 0,
+                       "Black" = 1)
+
+ thesis_long$whiteAsian <- dplyr::recode(thesis_long$targetRace, 
+                       "Asian" = 1,
+                       "Black" = 0,
+                       "White" = 0)
+
+thesis_long$dimensionC <- dplyr::recode(thesis_long$stereotype_dimension, 
+                       "Smart" = -.5,
+                       "Nice" = .5)
+
+```
+
+# Core analysis
+
+Children’s choices varied significantly by target gender β = 0.70, F(1, 1) = 51.06, p < .001, with children more likely to select women over men. There were also significant effects of target race. Children selected Asian targets more often than White targets β = 0.55, F(1, 1) = 64.72, p < .001, and White targets more often than Black targets β = –0.20, F(1, 1) = 8.38, p = .004.
+
+There is significant two-way interaction between target gender and target race. Specifically, children's choice on White or Black targets differ by the target gender (β = -0.64, F(1, 1) = 21.72, p < .001), Children's choice on White vs. Asian targets also differ by target gender (β = -0.68, F(1, 1) = 24.06, p < .001).
+
+There is significant two-way interaction between target  gender and stereotype dimension such that children's choice on woman vs. man target differ based on stereotype dimensions (i.e., smart or nice) (β = 0.85, F(1, 1) = 19.1, p < .001).
+
+There is significant three-way interaction between target gender, target race, and stereotype dimension. Children's choice of gender and White or Black targets differ by stereotype dimension (β = -0.82, F(1, 1) = 8.95, p < .001), children's choice of gender and White or Asian targets also differ by stereotype dimension (β = -0.78, F(1, 1) = 8.09, p < .001). 
+```{r, echo = F}
+
+# Analysis code from preregistration
+
+mod <- lmer(choice_score ~ targetGenderC * (whiteBlack + whiteAsian) * dimensionC + (1 | PID), data = thesis_long)
+summary(mod) ## Here is where you will get the betas (Estimate column), but ignore the p value and other stats in this code because it's not using the type of estimation parameters that you'll use
+
+Anova(mod, type=3, test = "F") #Here you are going to get the F-statistics & p values
+
+```
+
+## Breaking down the effects to understand the interactions:  
+  
+Target gender x whiteBlack interaction:  
+*Interpretation:* Participants' choices do not significantly differ between white and Black choices when considering men (p = 0.21), but do significantly differ between white and Black choices when considering women (p < .001). Namely, participants are more likely to choose a white woman than a Black woman. 
+```{r, echo = F}
+
+# Target gender x whiteBlack interaction:  
+emm_gender_race1 <- emmeans(mod, ~ whiteBlack | targetGenderC)
+emm_gender_race1
+pairs(emm_gender_race1)
+
+```
+
+Target gender x whiteAsian interaction:  
+*Interpretation:* Participants' choices significantly differ between Asian and white choices when considering men (p < .001) and women (p = 0.03). Participants were overall more likely to choose Asian than white targets. The difference between white and Asian choices is larger for men targets than for women targets. 
+
+```{r, echo = F}
+
+# Target gender x whiteAsian interaction:  
+emm_gender_race2 <- emmeans(mod, ~ whiteAsian | targetGenderC)
+emm_gender_race2
+pairs(emm_gender_race2)
+
+```
+
+Target gender x stereotype dimension interaction:  
+*Interpretation:* The gender effect was significantly larger in the Nice condition than in the Smart condition (p < .001), although in both conditions, when considering the effect in the context of the interaction, the gender effect was not significant (Smart, p = .89; Nice, p = .53). 
+```{r, echo = F}
+
+# Target gender x stereotype dimension interaction:  
+emm_gender_dimension <- emmeans(mod, ~ targetGenderC | dimensionC)
+emm_gender_dimension
+pairs(emm_gender_dimension)
+
+```
+
+Target gender x whiteBlack x dimension interaction:  
+*Interpretation:*  
+1. When considering smartness of white targets, there is no effect of gender (p = 0.19).  
+2. When considering niceness of white targets, women are considered nicer than men (p < .001).  
+3. When considering smartness of Black targets, there is no effect of gender (p = 0.55).  
+4. When considering niceness of Black targets, men are considered nicer than women (p = 0.006).
+
+```{r, echo = F}
+
+# Target gender x whiteBlack x stereotype dimension interaction:  
+emm_gender_whiteBlack_dimension <- emmeans(mod, ~ targetGenderC | dimensionC | whiteBlack)
+emm_gender_whiteBlack_dimension
+pairs(emm_gender_whiteBlack_dimension)
+
+```
+
+Target gender x whiteAsian x dimension interaction:  
+*Interpretation:*  
+1. When considering smartness of white targets, there is no effect of gender (p = 0.11).  
+2. When considering niceness of white targets, women are considered nicer than men (p < .001).  
+3. When considering smartness of Asian targets, there is no effect of gender (p = 0.45).  
+4. When considering niceness of Asian targets, men are considered nicer than women (p = 0.005).
+
+```{r, echo = F}
+
+# Target gender x whiteAsian x stereotype dimension interaction:  
+emm_gender_whiteAsian_dimension <- emmeans(mod, ~ targetGenderC | dimensionC | whiteAsian)
+emm_gender_whiteAsian_dimension
+pairs(emm_gender_whiteAsian_dimension)
+
+```
+
+### Graph the main effect
+
+# main effect of target gender on choice
+```{r, echo = F}
+
+
+ggplot(thesis_long, aes(x = targetGender, y = choice_score, fill = targetGender)) +
+  stat_summary(fun = mean, geom = "bar", width = 0.6) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.1) +
+  labs(x = "Target Gender", y = "Mean Choice Score",
+       title = "Main Effect of Target Gender on Children's Choices") +
+  scale_fill_manual(values = c("Woman" = "lightblue", "Man" = "#edc559")) +
+  theme_minimal()
+
+```
+
+# main effect of target race on choice
+```{r, echo = F}
+
+
+ggplot(thesis_long, aes(x = targetRace, y = choice_score, fill = targetRace)) +
+  stat_summary(fun = mean, geom = "bar", width = 0.6) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.1) +
+  labs(x = "Target Race", y = "Mean Choice Score",
+       title = "Main Effect of Target Race on Children's Choices") +
+  scale_fill_manual(values = c("White" = "#8CD790", "Black" = "#F5A65B", "Asian" = "#7D9EC0")) +
+  theme_minimal()
+
+```
+
+
+
+### Graph the 2-way interaction effect
+
+Interaction: Target Gender x Stereotype Dimension:
+Children tend to choose woman as nicer than man, but no significant differences in smartness between man and woman targets.
+```{r, echo = F}
+
+ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targetGender, group = targetGender)) +
+  stat_summary(fun = mean, geom = "line", size = 1) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_manual(
+    values = c("Woman" = "lightblue", "Man" = "#edc559"),
+    name = "Target Gender"
+  ) +
+  labs(
+    x = "Stereotype Dimension",
+    y = "Choice Score",
+    title = "Interaction: Target Gender x Stereotype Dimension"
+  ) +
+  theme_minimal()
+
+
+```
+
+
+Interaction: Target Race x Stereotype Dimension:
+In smart domain, children tend to choose Asian as smarter than White and Black target, and White as smarter than Black target. In nice domain, children tend to choose Asian as nicer than White and Black target, but no significant difference between the niceness of Black and White target.
+```{r, echo = F}
+
+
+ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targetRace, group = targetRace)) +
+  stat_summary(fun = mean, geom = "line", size = 1) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_manual(
+    values = c("White" = "#8CD790", "Black" = "#F5A65B", "Asian" = "#7D9EC0"),
+    name = "Target Race"
+  ) +
+  labs(
+    x = "Stereotype Dimension",
+    y = "Choice Score",
+    title = "Interaction: Target Race x Stereotype Dimension"
+  ) +
+  theme_minimal()
+
+
+```
+
+
+
+### Gragh the 3-way interaction
+
+```{r, echo = F}
+
+ modPlot <- lmer(choice_score ~ targetGender * targetRace * stereotype_dimension + (1 | PID), 
+             data = thesis_long)
+
+# Get estimated marginal means from the model using factors directly
+emm_results <- emmeans(modPlot, ~ targetGender * targetRace * stereotype_dimension)
+
+# Convert to data frame for plotting
+plot_data <- as.data.frame(emm_results)
+
+# Ensure factors are properly ordered
+plot_data$targetGender <- factor(plot_data$targetGender, levels = unique(plot_data$targetGender))
+plot_data$targetRace <- factor(plot_data$targetRace, levels = c("White", "Black", "Asian"))
+plot_data$stereotype_dimension <- factor(plot_data$stereotype_dimension, levels = c("Nice", "Smart"))
+
+# Create the bar graph
+ggplot(plot_data, aes(x = targetGender, y = emmean, fill = targetRace)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  facet_wrap(~ stereotype_dimension) +
+  labs(title = "Effect of Target Gender x Race by Dimension",
+       x = "Target Gender",
+       y = "Estimated Choice Score",
+       fill = "Target Race") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(face = "bold"),
+    strip.text = element_text(face = "bold", size = 12)
+  ) +
+  scale_fill_manual(values = c("White" = "#8CD790", "Black" = "#F5A65B", "Asian" = "#7D9EC0")) +
+  coord_cartesian(ylim = c(0, 4))  # Adjust y-axis limits as needed
+
+
+
+```
+
