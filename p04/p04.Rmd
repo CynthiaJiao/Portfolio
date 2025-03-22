@@ -338,14 +338,12 @@ ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targ
 
 
 ```
+Interaction: Target Gender x Target Race:
 
 
-Interaction: Target Race x Stereotype Dimension:
-In smart domain, children tend to choose Asian as smarter than White and Black target, and White as smarter than Black target. In nice domain, children tend to choose Asian as nicer than White and Black target, but no significant difference between the niceness of Black and White target.
 ```{r, echo = F}
 
-
-ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targetRace, group = targetRace)) +
+ggplot(thesis_long, aes(x = targetGender, y = choice_score, color = targetRace, group = targetRace)) +
   stat_summary(fun = mean, geom = "line", size = 1) +
   stat_summary(fun = mean, geom = "point", size = 3) +
   scale_color_manual(
@@ -353,9 +351,9 @@ ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targ
     name = "Target Race"
   ) +
   labs(
-    x = "Stereotype Dimension",
+    x = "Target Gender",
     y = "Choice Score",
-    title = "Interaction: Target Race x Stereotype Dimension"
+    title = "Interaction: Target Gender x Target Race"
   ) +
   theme_minimal()
 
@@ -363,9 +361,10 @@ ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targ
 ```
 
 
-
 ### Gragh the 3-way interaction
 
+
+In smart domain, children tend to choose Asian as smarter than White and Black target, and White as smarter than Black target. In nice domain, children tend to choose Asian as nicer than White and Black target, but no significant difference between the niceness of Black and White target.
 ```{r, echo = F}
 
  modPlot <- lmer(choice_score ~ targetGender * targetRace * stereotype_dimension + (1 | PID), 
@@ -404,6 +403,21 @@ ggplot(plot_data, aes(x = targetGender, y = emmean, fill = targetRace)) +
   coord_cartesian(ylim = c(0, 4))  # Adjust y-axis limits as needed
 
 
+## line graphs
+
+ggplot(thesis_long, aes(x = stereotype_dimension, y = choice_score, color = targetRace, group = targetRace)) +
+  stat_summary(fun = mean, geom = "line", size = 1) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_manual(
+    values = c("White" = "#8CD790", "Black" = "#F5A65B", "Asian" = "#7D9EC0"),
+    name = "Target Race"
+  ) +
+  labs(
+    x = "Stereotype Dimension",
+    y = "Choice Score",
+    title = "Interaction: Target Race x Target Gender x Stereotype Dimension"
+  ) +
+  theme_minimal()
 
 ```
 
