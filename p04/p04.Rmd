@@ -198,13 +198,13 @@ thesis_long$dimensionC <- dplyr::recode(thesis_long$stereotype_dimension,
 
 # Core analysis
 
-Children’s choices varied significantly by target gender β = 0.70, F(1, 1) = 51.06, p < .001, with children more likely to select women over men. There were also significant effects of target race. Children selected Asian targets more often than White targets β = 0.55, F(1, 1) = 64.72, p < .001, and White targets more often than Black targets β = –0.20, F(1, 1) = 8.38, p = .004.
+Children’s choices varied significantly by target gender β = 0.70, F(1, 1617) = 51.06, p < .001, with children more likely to select women over men. There were also significant effects of target race. Children selected Asian targets more often than White targets β = 0.55, F(1, 1617) = 64.72, p < .001, and White targets more often than Black targets β = –0.20, F(1, 1617) = 8.38, p = .004.
 
-There is significant two-way interaction between target gender and target race. Specifically, children's choice on White or Black targets differ by the target gender (β = -0.64, F(1, 1) = 21.72, p < .001), Children's choice on White vs. Asian targets also differ by target gender (β = -0.68, F(1, 1) = 24.06, p < .001).
+There is significant two-way interaction between target gender and target race. Specifically, children's choice on White or Black targets differ by the target gender (β = -0.64, F(1, 1617) = 21.72, p < .001), Children's choice on White vs. Asian targets also differ by target gender (β = -0.68, F(1, 1617) = 24.06, p < .001).
 
-There is significant two-way interaction between target  gender and stereotype dimension such that children's choice on woman vs. man target differ based on stereotype dimensions (i.e., smart or nice) (β = 0.85, F(1, 1) = 19.1, p < .001).
+There is significant two-way interaction between target  gender and stereotype dimension such that children's choice on woman vs. man target differ based on stereotype dimensions (i.e., smart or nice) (β = 0.85, F(1, 1617) = 19.1, p < .001).
 
-There is significant three-way interaction between target gender, target race, and stereotype dimension. Children's choice of gender and White or Black targets differ by stereotype dimension (β = -0.82, F(1, 1) = 8.95, p < .001), children's choice of gender and White or Asian targets also differ by stereotype dimension (β = -0.78, F(1, 1) = 8.09, p < .001). 
+There is significant three-way interaction between target gender, target race, and stereotype dimension. Children's choice of gender and White or Black targets differ by stereotype dimension (β = -0.82, F(1, 1617) = 8.95, p < .001), children's choice of gender and White or Asian targets also differ by stereotype dimension (β = -0.78, F(1, 1617) = 8.09, p < .001). 
 ```{r, echo = F}
 
 # Analysis code from preregistration
