@@ -1,0 +1,492 @@
+---
+title: "Portfolio 5"
+author: "Cynthia Jiao"
+date: "2025-3-29"
+---
+This time with my thesis data, I conducted 3 exploratory analyses, interpreted the results and graphed any significant effects.
+
+
+### Set up & clean the data
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(lme4)
+library(car)
+library(emmeans)
+library(effectsize)
+library(irr)
+library(tidycensus)
+library(lme4)
+```
+
+```{r, echo = F}
+
+qualtrics <-read.csv("Cynthia Thesis_March 5, 2025_11.29.csv")
+
+## cleaning the data by PID
+
+qualtrics <- qualtrics %>% 
+  select(-c(StartDate, EndDate, Status, IPAddress, Progress, Duration..in.seconds., RecordedDate, ResponseId, RecipientFirstName, RecipientLastName, RecipientEmail, ExternalReference, LocationLatitude, LocationLongitude, DistributionChannel, UserLanguage)) %>%
+  mutate(PID = as.numeric(PID)) %>%
+  arrange(PID) %>%
+  filter(!is.na(PID))
+
+## loading the data sheet from Google sheets
+
+sheets <-read_excel("Intersectional Stereotypes Data.xlsx")
+
+sheets <- sheets %>%
+  filter(!is.na(PID)) %>%
+  mutate(PID = as.numeric(PID))
+
+## merging two data set by PID
+
+thesis <- full_join(qualtrics, sheets, by = "PID")
+
+## excluding the duplicated PID with empty Qualtrics responses
+
+##TODO: remove remove this line for full data
+
+## Identify PIDs that appear more than once
+
+# duplicate_pids <- thesis %>%
+#   count(PID) %>%
+#   filter(n > 1) %>%
+#   pull(PID) ##TODO: remove remove this line for full data
+
+thesis <- thesis %>%
+  filter(!is.na(smart_screener1))
+
+## exclude the excluded participants
+
+thesis <- thesis %>%
+  filter(exclude %in% c("no", "no; half data"))
+
+
+```
+
+```{r, echo = F}
+
+## creating a composite score for each social group being selected
+
+## manually specify column names for smart and nice selections
+
+smart_cols <- c("S1_1", "S1_2", "S1_3", "S1_4", "S1_5", "S1_6", "S1_7", 
+                "S1_8", "S1_9", "S1_10", "S1_11", "S1_12", "S1_13", "S1_14", "S1_15", "S2_1", "S2_2", "S2_3", "S2_4", "S2_5", "S2_6", "S2_7", 
+                "S2_8", "S2_9", "S2_10", "S2_11", "S2_12", "S2_13", "S2_14", "S2_15")
+
+nice_cols <- c("N1_1", "N1_2", "N1_3", "N1_4", "N1_5", "N1_6", "N1_7", 
+               "N1_8", "N1_9", "N1_10", "N1_11", "N1_12", "N1_13", "N1_14", "N1_15", "N2_1", "N2_2", "N2_3", "N2_4", "N2_5", "N2_6", "N2_7", 
+               "N2_8", "N2_9", "N2_10", "N2_11", "N2_12", "N2_13", "N2_14", "N2_15")
+
+## create a function to count the numbers of each social group being selected
+
+count_selections <- function(data, cols) {
+  data %>%
+    select(PID, all_of(cols)) %>%
+    mutate(CompletedVersion = ifelse(rowSums(!is.na(select(., starts_with("S1")))) > 0, "S1", "S2")) %>%
+    pivot_longer(cols = -c(PID, CompletedVersion), names_to = "Question", values_to = "Selection") %>%
+    filter(!is.na(Selection) & Selection != "") %>%  # Remove unassigned version (empty values)
+    group_by(PID, Selection) %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    pivot_wider(names_from = Selection, values_from = Count, values_fill = list(Count = 0))
+}
+
+## process smart and nice data separately
+
+smart_counts <- count_selections(thesis, smart_cols)
+nice_counts <- count_selections(thesis, nice_cols)
+
+
+```
+
+```{r, echo = F}
+
+# Add stereotype dimension label
+smart_long <- smart_counts %>%
+  mutate(stereotype_dimension = "Smart") %>%
+  pivot_longer(cols = -c(PID, stereotype_dimension), names_to = "targetGroup", values_to = "choice_score")
+
+nice_long <- nice_counts %>%
+  mutate(stereotype_dimension = "Nice") %>%
+  pivot_longer(cols = -c(PID, stereotype_dimension), names_to = "targetGroup", values_to = "choice_score")
+
+# Combine into one dataset
+thesis_long <- bind_rows(smart_long, nice_long)
+
+
+```
+
+```{r, echo = F}
+
+# Extract targetGender and targetRace from "targetGroup" column
+
+thesis_long <- thesis_long %>%
+  mutate(targetGender = case_when(grepl(" man", targetGroup) ~ "Man", ##### here was the bug!!!!! fixed by adding a space in front of "man", because grepl might recognize "woman" as "man" because "woman" has "man" string too!!
+                                  grepl("woman", targetGroup) ~ "Woman")) %>% 
+  mutate(targetRace = case_when(
+           grepl("Black", targetGroup) ~ "Black",
+           grepl("White", targetGroup) ~ "White",
+           grepl("Asian", targetGroup) ~ "Asian"
+         ))
+
+```
+
+```{r, echo = F}
+### Center and recode variables for analysis
+
+## center target gender predictor  
+
+thesis_long$targetGenderC <- dplyr::recode(thesis_long$targetGender, 
+                       "Man" = -.5,
+                       "Woman" = .5)
+
+# Two contrasts for 3-level factor:
+
+# Let's start with white people as the race reference group given that we know that children from most racial backgrounds show a bias favoring white people
+thesis_long$whiteBlack <- dplyr::recode(thesis_long$targetRace, 
+                       "White" = 0,
+                       "Asian" = 0,
+                       "Black" = 1)
+
+ thesis_long$whiteAsian <- dplyr::recode(thesis_long$targetRace, 
+                       "Asian" = 1,
+                       "Black" = 0,
+                       "White" = 0)
+
+thesis_long$dimensionC <- dplyr::recode(thesis_long$stereotype_dimension, 
+                       "Smart" = -.5,
+                       "Nice" = .5)
+
+```
+
+### Exploratory Analysis
+
+1.  Do the race effects differ by experimenter race?
+
+```{r, echo = F}
+
+experimenterRace = thesis %>%
+  select(PID, experimenterRace)
+
+thesis_long = full_join(thesis_long, experimenterRace)
+
+# clean the data set again because full_join brings in excluded participants and empty rows
+thesis_long <- thesis_long %>%
+  filter(!is.na(PID), !is.na(stereotype_dimension))
+
+thesis_long$experimenterRace <- dplyr::recode(thesis_long$experimenterRace, 
+                       "Asian" = -.5,
+                       "White" = .5)
+
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * experimenterRace + (1 | PID), data = thesis_long)
+summary(mod) ## Here is where you will get the betas (Estimate column), but ignore the p value and other stats in this code because it's not using the type of estimation parameters that you'll use
+
+Anova(mod, type=3, test = "F") #Here you are going to get the F-statistics & p values
+
+
+
+```
+
+Interpreting the experimenter race x whiteAsian interaction:
+Across the board, participants chose more Asian than white people, but the effect was stronger when the experimenter was Asian (p < .001) compared to white (p = .004).
+
+```{r, echo = F}
+
+# whiteAsian x experimenter race interaction:  
+emm_expRace_whiteAsian <- emmeans(mod, ~ whiteAsian | experimenterRace)
+emm_expRace_whiteAsian
+pairs(emm_expRace_whiteAsian)
+
+```
+
+## Does this two way interaction effect differ by stereotype dimension?
+
+There is no three way interaction between whiteBlack:experimenterRace:dimension OR whiteAsian:experimenterRace:dimension. However, the pairwise contrast did reveal significant 3 way interaction effect. It could be that effect was detected with a small effect size/power, as well as effect from 2 way interaction. That said, there is no need to look at the pairwise contrast when the 3 way interaction is not significant in the model. However, this does open up possibility of running this study unmoderated where experimenter effect is removed (study 2).
+
+```{r, echo = F}
+
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * experimenterRace * dimensionC + (1 | PID), data = thesis_long)
+summary(mod) ## Here is where you will get the betas (Estimate column), but ignore the p value and other stats in this code because it's not using the type of estimation parameters that you'll use
+
+Anova(mod, type=3, test = "F") #Here you are going to get the F-statistics & p values
+
+
+```
+
+```{r}
+
+## breakdown for experimenter race
+
+table(thesis$experimenterRace)
+
+ggplot(as.data.frame(table(thesis$experimenterRace)), aes(x = "", y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  theme(legend.title = element_blank()) +
+  ggtitle("Experimenter Race Distribution (by numbers of session)") +
+  geom_text(aes(label = paste0(round(Freq / sum(Freq) * 100, 1), "%")), 
+            position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("White" = "#fffd8d", "Asian" = "#89c4ff")) 
+
+```
+
+2.  Do the choice differ by child age?
+
+Yes, although age does not directly affect children's choices (p = .43), there is a significant interaction between age and target race, specifically when comparing white and asian target (F = 3.24, p = 0.01). This means that the difference between Asian and White target choice scores changes with age. As children get older, they tend to choose Asian targets more than White targets, whereas there is no significant age effect for the Black versus White contrast. Through pairwise comparisons, such tendency to choose Asian targets over White targets is not found among 6-year-olds (p = 0.08), but seen among 7- to 10-year-olds (all p< 0.05).
+
+There is also a significant three-way interaction whiteAsian:age:dimensionC (p = 0.04)
+
+```{r, echo = F}
+
+age = thesis %>%
+  select(PID, `Age (CALCULATED FROM PREVIOUS COLUMNS)`)
+
+thesis_long = full_join(thesis_long, age)
+
+thesis_long <-thesis_long %>%
+  mutate(age = as.factor(`Age (CALCULATED FROM PREVIOUS COLUMNS)`))
+
+# clean the data set again because full_join brings in excluded participants and empty rows
+thesis_long <- thesis_long %>%
+  filter(!is.na(PID), !is.na(stereotype_dimension))
+
+##TODO: question to Katharine, I don't think I can center the age variable, so I treated as a factor with multiple level, is this correct? If so, where to get the beta, since the emmeans gives multiple betas to each age level, not one single beta.
+
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * age * targetGenderC * dimensionC + (1 | PID), data = thesis_long)
+summary(mod) ## Here is where you will get the betas (Estimate column), but ignore the p value and other stats in this code because it's not using the type of estimation parameters that you'll use
+
+Anova(mod, type=3, test = "F") #Here you are going to get the F-statistics & p values
+
+
+```
+```{r, echo = F}
+
+##pairwise comparisons since the whiteAsian * age interaction is significant 
+
+emm_age_whiteAsian_age <- emmeans(mod, ~ whiteAsian | age)
+emm_age_whiteAsian_age
+pairs(emm_age_whiteAsian_age)
+
+
+```
+
+
+
+## unpack the three-way interaction
+
+```{r, echo = F}
+
+
+emm_whiteAsian_age_dimension <- emmeans(mod, ~ age | whiteAsian | dimensionC)
+emm_whiteAsian_age_dimension
+pairs(emm_whiteAsian_age_dimension)
+
+```
+
+## gragh the effect
+
+```{r, echo = F}
+
+emm_age_whiteAsian <- emmeans(mod, ~ whiteAsian | age)
+
+# Convert the emmeans output to a data frame
+emm_df <- as.data.frame(emm_age_whiteAsian)
+
+# age is stored as a factor, convert it to numeric for the plot
+emm_df$age <- as.numeric(as.character(emm_df$age))
+
+
+# label the 0 and 1 levels in whiteAsian contrast
+emm_df$whiteAsian <- factor(emm_df$whiteAsian,
+                            levels = c("0", "1"),
+                            labels = c("White target", "Asian target"))
+
+# Graph the interaction effect
+ggplot(emm_df, aes(x = age, y = emmean, color = whiteAsian, group = whiteAsian)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  scale_x_continuous(breaks = c(6,7,8,9,10)) +
+  labs(x = "Age (years)",
+       y = "Children's Choice Score",
+       color = "White vs. Asian Contrast") +
+  theme_minimal() +
+  ggtitle("Interaction of Age and White vs. Asian Contrast on Children's Choice")
+
+```
+
+```{r, echo = F}
+
+# rewrite the mod for graph
+
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * age * targetGenderC * stereotype_dimension + (1 | PID), data = thesis_long)
+  
+emm_whiteAsian_age_dimension <- emmeans(mod, ~ whiteAsian | age | stereotype_dimension)
+
+emm_df <- as.data.frame(emm_whiteAsian_age_dimension)
+
+# Create a line plot: x-axis = age, separate lines for whiteAsian, faceted by dimensionC
+
+ggplot(emm_df, aes(x = age, y = emmean, group = whiteAsian, color = whiteAsian)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  facet_wrap(~ stereotype_dimension) +
+  labs(x = "Age", 
+       y = "Choice Score", 
+       color = "Target Race\n(0 = White, 1 = Asian)",
+       title = "Three-Way Interaction: Target Race by Age and Stereotype Dimension") +
+  theme_minimal()
+
+```
+
+
+
+3.  Do the choice differ by children's own race and gender background?
+
+# effect of children's own race
+
+Children's choice on target race do not differ by their own race (omnibus test p = .68)
+
+When using dichotomous variables to measure children's race, the effect is still not significant (p = .26)
+
+```{r, echo = F}
+
+Race = thesis %>%
+  select(PID, Race)
+
+thesis_long <- full_join(thesis_long, Race, by = "PID")
+
+# clean the data set again because full_join brings in excluded participants and empty rows
+thesis_long <- thesis_long %>%
+  filter(!is.na(PID), !is.na(stereotype_dimension))
+
+
+thesis_long <- thesis_long %>%
+  mutate(Race = case_when(
+    Race == "A, B" ~ "Mixed",
+    Race == "A, W" ~ "Mixed",
+    Race == "A, H" ~ "Mixed",
+    Race == "B, W" ~ "Mixed",
+    Race == "AIAN, W" ~ "Mixed",
+    Race == "AIAN, H" ~ "Mixed",
+    Race == "A, B, W, H" ~ "Mixed",
+    Race == "Other: Mixed" ~ "Mixed",
+    Race == "Other: mixed" ~ "Mixed",
+    Race == "W, H" ~ "Latinx",
+    Race == "Other: Middle East" ~ "middleEast",
+    Race == "chose not to respond" ~ "No",
+    TRUE ~ Race
+  ))
+
+# filter out the No response
+
+thesis_long <- thesis_long %>%
+  filter(Race != "No")
+
+# use dichotomous variable for race (white vs. non-white)
+
+thesis_long <- thesis_long %>%
+  mutate(RaceW = case_when(
+    Race == "W" ~ "yes",
+    Race %in% c("Mixed", "A", "B", "middleEast", "Latinx") ~ "no",
+    TRUE ~ "no"  # any other values are also coded as "no"
+  ))
+
+## Race has multiple levels, but it just doesn't make sense to set a reference group. If use multiple level without setting any contrast, just use anova, not lmer, otherwise it cannot be interpreted
+
+
+# Set sum contrasts for Race as a way for omnibus test
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * Race * targetGenderC * dimensionC + (1 | PID), data = thesis_long)
+
+thesis_long$Race <- factor(thesis_long$Race)
+contrasts(thesis_long$Race) <- contr.sum(nlevels(thesis_long$Race))
+
+library(car)
+Anova(mod, type = 3, test = "F")
+
+
+
+```
+
+# effect of children's own gender
+
+Children's choice on target do no differ significantly based on children's own gender (p = 0.31)
+
+However, children's choice on target gender differ significantly based on their own gender (p<0.001).
+
+```{r, echo = F}
+
+
+Gender = thesis %>%
+  select(PID, Gender)
+
+thesis_long <- full_join(thesis_long, Gender, by = "PID")
+
+## center gender   
+
+thesis_long$GenderC <- dplyr::recode(thesis_long$Gender, 
+                       "boy" = -.5,
+                       "girl" = .5)
+
+# clean the data set again because full_join brings in excluded participants and empty rows
+thesis_long <- thesis_long %>%
+  filter(!is.na(PID), !is.na(stereotype_dimension))
+
+
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * GenderC * targetGenderC * dimensionC + (1 | PID), data = thesis_long)
+summary(mod) ## Here is where you will get the betas (Estimate column), but ignore the p value and other stats in this code because it's not using the type of estimation parameters that you'll use
+
+Anova(mod, type=3, test = "F") #Here you are going to get the F-statistics & p values
+
+
+
+
+```
+
+## unpack the Gender * targetGender interaction
+
+The target gender of children's choice differ by their own gender. Girls tend to choose woman target more than boys (p<0.001); boys tend to choose man target more than girls (p<0.001).
+
+```{r, echo = F}
+
+emm_gender_targetGender <- emmeans(mod, ~ targetGenderC | GenderC)
+emm_gender_targetGender
+pairs(emm_gender_targetGender)
+
+
+```
+
+## graph the interaction
+
+```{r, echo = F}
+
+## set a new mod for graph
+mod <- lmer(choice_score ~ (whiteBlack + whiteAsian) * Gender * targetGender * dimensionC + (1 | PID), data = thesis_long)
+
+emm_gender_targetGender <- emmeans(mod, ~ targetGender | Gender)
+
+df_emm <- as.data.frame(emm_gender_targetGender)
+
+## bar chart
+ggplot(df_emm, aes(x = Gender, y = emmean, fill = targetGender)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(
+    aes(ymin = lower.CL, ymax = upper.CL),
+    width = 0.2,
+    position = position_dodge(width = 0.9)
+  ) +
+  labs(
+    x = "Child's Gender",
+    y = "Estimated Choice Score",
+    fill = "Target Gender",
+    title = "Interaction: Child's Gender x Target Gender"
+  ) +
+  scale_fill_manual(values = c("Woman" = "lightblue", "Man" = "#edc559")) +
+  theme_minimal()
+
+```
