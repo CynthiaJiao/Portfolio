@@ -2,6 +2,7 @@
 title: "Portfolio 6"
 author: "Cynthia Jiao"
 date: "4/3/2025"
+output: html_document
 ---
 I will be doing the last exploratory analyses of my thesis data for this portfolio. This is a zip code analysis of the effect of neighborhood diversity (proportion of minority population) on children's stereotyping choices (spolier alert it's not significant), plus an interactive map showing the participants' zip code distribution.
 
@@ -22,6 +23,9 @@ library(gtsummary)
 library(ggpubr)
 library(tibble)
 library(sf)
+library(viridis)
+library(ggplot2)
+library(plotly)
 ```
 
 # Cleaning the dataset
@@ -148,6 +152,11 @@ thesis_long$targetGenderC <- dplyr::recode(thesis_long$targetGender,
                        "Man" = -.5,
                        "Woman" = .5)
 
+## center dimensions
+thesis_long$dimensionC <- dplyr::recode(thesis_long$stereotype_dimension, 
+                       "Smart" = -.5,
+                       "Nice" = .5)
+
 # Two contrasts for 3-level factor:
 
 # Let's start with white people as the race reference group given that we know that children from most racial backgrounds show a bias favoring white people
@@ -161,9 +170,17 @@ thesis_long$whiteBlack <- dplyr::recode(thesis_long$targetRace,
                        "Black" = 0,
                        "White" = 0)
 
-thesis_long$dimensionC <- dplyr::recode(thesis_long$stereotype_dimension, 
-                       "Smart" = -.5,
-                       "Nice" = .5)
+
+ thesis_long$blackWhite <- dplyr::recode(thesis_long$targetRace, 
+                       "White" = 1,
+                       "Asian" = 0,
+                       "Black" = 0)
+
+ thesis_long$blackAsian <- dplyr::recode(thesis_long$targetRace, 
+                       "Asian" = 1,
+                       "Black" = 0,
+                       "White" = 0)
+
 
 ```
 
