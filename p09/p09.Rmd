@@ -1,0 +1,167 @@
+---
+title: "Portfolio 9, Lab: Academic Freedom"
+author: "Cynthia Jiao"
+date: "2025-4-16"
+---
+
+Hi Mason! I think the radar plot is super cool and a great way to visualize and compare multiple variables over time, but I wish I learned this earlier. I could totally see the possibility of using radar plot for studies that have multiple DV and different conditions (so to graph the mean of DV for each condition). Maybe this could be another direction that this lab could go into? Students can clean up the dataset, get descriptive statistics, visualize them into a radar plot, and then run a regression/anova model to see the differences. The only thing that trapped me for a while is installing the vdemdata and ggradar package, because I did not know you can type and just run the number in console! I imagine this might trap other students as well (or really just me?), so maybe add a hint to the git website saying that we should really pay attention to the console?
+
+
+
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = TRUE)
+library(vdemdata)
+library(tidyverse)
+library(ggradar)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+
+```
+
+# Excercise 1
+
+scales::rescale essentially rescaled every variable except for year and country_name to be comparable (within each column). All the rescaled values are within 0 to 1, and raw values that exceeded 1 are now all converted to the 0 - 1 range. I don't think any indicators show more dramatic declines than others, since the differences between rescaled values are still meaningful?
+```{r}
+
+vdem <- vdemdata::vdem%>%
+  select(country_name, year, v2cafres, v2cafexch, v2cainsaut, v2casurv, v2clacfree)
+
+vdem_scaled <- vdem %>%
+  mutate(across(-c(year,country_name), scales::rescale))
+
+
+
+```
+
+# Excercise 2
+
+## Radar Plot for US
+
+Overall, it seems that all five aspects of academic freedom in the US boosted from the year of 1954 to the year of 2014, however, all five aspects collapsed in 2024, compared to a decade ago. Academic expression remains relatively high in the year of 2024.
+```{r}
+
+u_data_scaled <- vdem  %>% #vdem_scaled  %>%
+  filter(country_name %in% c("United States of America"), year %in% c(1954, 2014, 2024)) %>%
+  select(year, 
+         country_name,
+         research_teach = v2cafres,
+         exchange = v2cafexch,
+         autonomy = v2cainsaut,
+         integrity = v2casurv,
+         expression = v2clacfree) %>%
+  mutate(year = as.factor(year)) %>%
+  rename(group = year)
+
+
+u_data_scaled %>% filter(country_name == "United States of America") %>% select(-country_name) %>%
+ggradar(
+        grid.min = 0, grid.mid =.5, grid.max = 1,
+        group.line.width = 1.2,
+        group.point.size = 3,
+        legend.position = "bottom") + 
+    scale_color_viridis_d()
+
+
+```
+## Radar Plot for UK
+
+Overall, it appears that academic freedom in the UK experienced improvements across most aspects from 1954 to 2014. However, by 2024, several key aspects show noticeable decline compared to a decade earlier. The freedom to research and teach, as well as academic exchange, remain relatively strong, but institutional autonomy, integrity, and academic expression have significantly weakened.
+```{r}
+
+u_data_scaled <- vdem  %>% #vdem_scaled  %>%
+  filter(country_name %in% c("United Kingdom"), year %in% c(1954, 2014, 2024)) %>%
+  select(year, 
+         country_name,
+         research_teach = v2cafres,
+         exchange = v2cafexch,
+         autonomy = v2cainsaut,
+         integrity = v2casurv,
+         expression = v2clacfree) %>%
+  mutate(year = as.factor(year)) %>%
+  rename(group = year)
+
+
+u_data_scaled %>% filter(country_name == "United Kingdom") %>% select(-country_name) %>%
+ggradar(
+        grid.min = 0, grid.mid =.5, grid.max = 1,
+        group.line.width = 1.2,
+        group.point.size = 3,
+        legend.position = "bottom") + 
+    scale_color_viridis_d()
+
+
+
+```
+
+# Excercise 3
+
+China also experienced some decline in academic freedom from 2014 to 2024. As of the year of 2024, the values of research_teach, exchange, autonomy, and integrity of China and the US are pretty similar, despite US having much higher ratings of academic expression.
+```{r}
+# identify countries where freedom to research and teach declined by more than 0.2 points between 2014 and 2024.
+afi_declines <- vdem %>%
+  filter(year %in% c(1954, 2014, 2024)) %>%
+  select(country_name, year, v2cafres) %>%
+  pivot_wider(names_from = year, values_from = v2cafres) %>%
+  mutate(diff = `2024` - `2014`) %>%
+  filter(diff < -0.2) %>%
+  arrange(diff)
+
+# plot one of the countries in the list above
+
+chosen_country <- "China" # Replace this with your selected country
+
+china_data <- vdem %>%
+  filter(country_name == chosen_country, year %in% c(2014, 2024)) %>%
+  select(year, 
+         research_teach = v2cafres,
+         exchange = v2cafexch,
+         autonomy = v2cainsaut,
+         integrity = v2casurv,
+         expression = v2clacfree) %>%
+#  mutate(across(-year, scales::rescale)) %>%
+  mutate(year = as.factor(year)) %>%
+  rename(group = year) 
+
+ggradar(china_data,
+        grid.min = -3, grid.mid = 0, grid.max = 3,
+        group.line.width = 1.2,
+        group.point.size = 3,
+        legend.position = "bottom")
+
+
+```
+
+
+Mexico also has a notable decline in academic freedom between 2014 and 2024. I googled and it seems that Mexico also had a significant funding cut for research during the past decade, possibly explaining the notable decline in institutional autonomy or government funded international exchange.
+```{r}
+
+# plot one of the countries in the list above
+
+chosen_country <- "Mexico" # Replace this with your selected country
+
+china_data <- vdem %>%
+  filter(country_name == chosen_country, year %in% c(2014, 2024)) %>%
+  select(year, 
+         research_teach = v2cafres,
+         exchange = v2cafexch,
+         autonomy = v2cainsaut,
+         integrity = v2casurv,
+         expression = v2clacfree) %>%
+#  mutate(across(-year, scales::rescale)) %>%
+  mutate(year = as.factor(year)) %>%
+  rename(group = year) 
+
+ggradar(china_data,
+        grid.min = -3, grid.mid = 0, grid.max = 3,
+        group.line.width = 1.2,
+        group.point.size = 3,
+        legend.position = "bottom")
+
+
+
+```
+
+
