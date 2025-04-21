@@ -2,6 +2,7 @@
 title: "Portfolio 9, Lab: Academic Freedom"
 author: "Cynthia Jiao"
 date: "2025-4-16"
+output: html_document
 ---
 
 Hi Mason! I think the radar plot is super cool and a great way to visualize and compare multiple variables over time, but I wish I learned this earlier. I could totally see the possibility of using radar plot for studies that have multiple DV and different conditions (so to graph the mean of DV for each condition). Maybe this could be another direction that this lab could go into? Students can clean up the dataset, get descriptive statistics, visualize them into a radar plot, and then run a regression/anova model to see the differences. The only thing that trapped me for a while is installing the vdemdata and ggradar package, because I did not know you can type and just run the number in console! I imagine this might trap other students as well (or really just me?), so maybe add a hint to the git website saying that we should really pay attention to the console?
