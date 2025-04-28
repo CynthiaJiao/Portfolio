@@ -108,16 +108,14 @@ confint(mod)
 
 2. Is there an effect of labeling, exclusion marking, or like/okay question type on children's confrontation of discrimination?
 
-I don't have data for this analysis yet, but I wrote the codes any ways! Children's confrontation (DV) is a categorical variable with two levels, so we are using 
+I don't have data for this analysis yet, but I wrote the codes any ways! Children's confrontation (DV) is a categorical variable with two levels, so we are using generalized linear model, not lm.
 
 ```{r, echo = F}
 
 
-
-mod <-glm(confrontation ~ LabelingC * ExclusionC * LikeOkayC, family = binomial, data = morki2)
-
-summary(mod)
-confint(mod)
+# mod <-glm(confrontation ~ LabelingC * ExclusionC * LikeOkayC, family = binomial, data = morki2)
+# summary(mod)
+# confint(mod)
 
 
 
