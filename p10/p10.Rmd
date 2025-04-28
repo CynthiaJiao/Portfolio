@@ -1,0 +1,228 @@
+---
+title: "Portfolio 10"
+author: "Cynthia Jiao"
+date: "2025-04-25"
+output: html_document
+---
+
+Hi Mason, this data is from another project I am doing with Katharine. We wondered if some cues could help children better recognize a peer exclusion based on race in the hypothetical scenes. We examined the effect of labeling race for children, exclusion marking, and switching between okay/not okay or like/not like question types on children's evaluation and confrontation of racial discrimination. I just got the most of the full data (still missing a few but they probably wouldn't sway the results too much) and this portfolio is to examine the effect of all 3 IVs on children's evaluation of racial discrimination, since we need RA's coding to measure children's confrontation. All 3 IVs are categorical (2 levels within each IV). DV (evaluation) is continous from -6 to 6.
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(emmeans)
+```
+
+## Clean Dataset
+
+
+```{r, echo=FALSE}
+
+
+morki2 <- read_xlsx("Morki Study 2 (Full Study) Data.xlsx")
+
+morki2 <-morki2 %>%
+  filter(exclude == "no") %>%
+  select(-RedCapID, -`...22`)
+
+# recode Condition to be 3 separate IVs
+
+morki2 <- morki2 %>%
+  # 1) split on the underscores:
+  separate(Condition,
+           into = c("Labeling", "Exclusion", "LikeOkay"),
+           sep  = "_",
+           remove = FALSE,        # keep original if you want
+           fill   = "right") %>%  # in case some rows lack a part
+  mutate(
+    Labeling = recode(Labeling,
+                      L  = "L",
+                      NL = "NL"),
+    Exclusion = recode(Exclusion,
+                       E  = "E",
+                       NE = "NE"),
+    LikeOkay = recode(LikeOkay,
+                          Like = "Like",
+                          Okay = "Okay"),
+    across(c(Labeling, Exclusion, LikeOkay),
+           ~ factor(.x))      # turn into factors
+  )
+
+# code evaluation DV
+
+morki2 <- morki2 %>%
+  mutate_at(vars(morkiTrial1:morkiTrial6), as.numeric) %>%
+  mutate(evaluation = morkiTrial1 + morkiTrial2 + morkiTrial3 + morkiTrial4 + morkiTrial5 + morkiTrial6) %>%
+  mutate(evaluation = as.numeric(evaluation))
+
+
+```
+
+## Center the IV conditions
+
+```{r, echo = F}
+
+morki2 <- morki2 %>%
+  mutate(
+    LabelingC   = recode(Labeling,   L  =  0.5, NL = -0.5),
+    ExclusionC  = recode(Exclusion,  E  =  0.5, NE = -0.5),
+    LikeOkayC   = recode(LikeOkay,   Okay =  0.5, Like = -0.5)
+  )
+
+```
+
+## Preregistered Analyses
+
+
+1. Is there an effect of labeling, exclusion marking, or like/okay question type on children's evaluation of discrimination?
+
+Labeling race has a significant effect on children's evaluation of discrimination such that children in labeling condition are more likely to negatively evaluate the discrimination. β = –1.79, SE = 0.58, t = –3.08, p = .002.
+
+Exclusion marking has a significant effect on children's evaluation of discrimination such that children in exclusion marking condition are more likely to negatively evaluate the discrimination. β = –1.40, SE = 0.58, t = –2.42, p = .02
+
+Question type has a significant effect on children's evaluation of discrimination such that children who are asked "do you think this is okay or not okay" are more likely to negatively evaluate the discrimination. β = –1.24, SE = 0.58, t = –2.14, p = .03
+
+I don't have a lot of thoughts on why there is no interaction between any of the IVs at all, since I didn't have a specific prediction for possible interactions, but I will dig more into this after I have the full sample size with all variables...
+
+```{r, echo = F}
+
+
+
+mod <-lm(evaluation ~ LabelingC * ExclusionC * LikeOkayC, data = morki2)
+
+summary(mod)
+confint(mod)
+
+
+
+
+```
+
+
+2. Is there an effect of labeling, exclusion marking, or like/okay question type on children's confrontation of discrimination?
+
+I don't have data for this analysis yet, but I wrote the codes any ways! Children's confrontation (DV) is a categorical variable with two levels, so we are using 
+
+```{r, echo = F}
+
+
+
+mod <-glm(confrontation ~ LabelingC * ExclusionC * LikeOkayC, family = binomial, data = morki2)
+
+summary(mod)
+confint(mod)
+
+
+
+
+```
+
+
+## Graph the Effects
+
+1. main effect of 3 IVs on children's evaluation, separately, since there is not any interaction effect.
+
+
+```{r, echo = F}
+
+# fit full model
+mod <- lm(evaluation ~ LabelingC * ExclusionC * LikeOkayC, data = morki2)
+
+# get marginal means for each IV in turn
+emm_lab <- emmeans(mod,
+                   ~ LabelingC,
+                   at = list(ExclusionC = 0, LikeOkayC = 0))
+emm_exc <- emmeans(mod,
+                   ~ ExclusionC,
+                   at = list(LabelingC = 0, LikeOkayC = 0))
+emm_q   <- emmeans(mod,
+                   ~ LikeOkayC,
+                   at = list(LabelingC = 0, ExclusionC = 0))
+
+# tidy them up into data frames
+lab_df <- as.data.frame(emm_lab) %>%
+  mutate(Condition = if_else(LabelingC > 0, "Label", "No Label")) # labelingC > 0 means 0.5 is marked as "Label"
+
+exc_df <- as.data.frame(emm_exc) %>%
+  mutate(Condition = if_else(ExclusionC > 0, "Exclusion Marking", "No Exclusion Marking"))
+
+q_df   <- as.data.frame(emm_q) %>%
+  mutate(Condition = if_else(LikeOkayC > 0, "Okay/Not Okay Question", "Like/Not Like Question"))
+
+
+```
+
+# bar graph for race labeling on evaluation
+
+```{r, echo = F}
+
+ggplot(lab_df, aes(x = Condition, y = emmean, fill = Condition)) +
+  geom_col(width = 0.5) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2) +
+  scale_fill_manual(values = c(
+    "No Label" = "#2972b6",
+    "Label"    = "#ff92ba"
+  )) +
+  labs(title = "Main Effect of Race Labeling on Children’s Evaluation of Discrimination",
+       x = "Race Labeling", 
+       y = "Predicted Evaluation Score") +
+  scale_x_discrete(name   = "Race Labeling",
+                   labels = NULL) + ## this removes the name for each race labeling condition at the bottom of x-axis.
+  theme_minimal()
+
+```
+
+
+# bar graph for question type on evaluation
+
+```{r, echo = F}
+
+ggplot(q_df, aes(x = Condition, y = emmean, fill = Condition)) +
+  geom_col(width = 0.5) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2) +
+  scale_fill_manual(values = c(
+    "Okay/Not Okay Question" = "#f9a54e",
+    "Like/Not Like Question" = "#798c35"
+  )) +
+  labs(title = "Main Effect of Question Type on Children’s Evaluation of Discrimination",
+       x = "Question Type", 
+       y = "Predicted Evaluation Score") +
+  scale_x_discrete(name   = "Question Type",
+                   labels = NULL) + ## this removes the name for each question type condition at the bottom of x-axis.
+  theme_minimal() 
+
+```
+
+
+# bar graph for exclusion marking on evaluation
+
+```{r, echo = F}
+
+ggplot(exc_df, aes(x = Condition, y = emmean, fill = Condition)) +
+  geom_col(width = 0.5) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2) +
+  scale_fill_manual(values = c(
+    "Exclusion Marking" = "#ffd700",
+    "No Exclusion Marking"     = "#ccc9ff"
+  )) +
+  labs(title = "Main Effect of Exclusion Marking on Children’s Evaluation of Discrimination",
+       x = "Exclusion Marking", 
+       y = "Predicted Evaluation Score") +
+  scale_x_discrete(name   = "Exclusion Marking",
+                   labels = NULL) + ## this removes the name for each exclusion marking condition at the bottom of x-axis.
+  theme_minimal()
+
+
+```
+
+
