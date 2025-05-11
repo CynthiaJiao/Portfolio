@@ -2,6 +2,7 @@
 title: "Portfolio 5"
 author: "Cynthia Jiao"
 date: "2025-3-29"
+output: html_document
 ---
 This time with my thesis data, I conducted 3 exploratory analyses, interpreted the results and graphed any significant effects.
 

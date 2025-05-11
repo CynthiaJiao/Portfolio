@@ -4,7 +4,7 @@ author: "Cynthia Jiao"
 date: "4/3/2025"
 output: html_document
 ---
-I will be doing the last exploratory analyses of my thesis data for this portfolio. This is a zip code analysis of the effect of neighborhood diversity (proportion of minority population) on children's stereotyping choices (spolier alert it's not significant), plus an interactive map showing the participants' zip code distribution.
+I will be doing the last exploratory analyses of my thesis data for this portfolio. This is a zip code analysis of the effect of neighborhood diversity (proportion of minority population) on children's stereotyping choices (spolier alert it's not significant), plus a map showing the participants' zip code distribution.
 
 ```{r setup, include = F}
 knitr::opts_chunk$set(echo = TRUE)
@@ -333,7 +333,7 @@ zip_counts <- zip_counts %>%
 zcta_map <- left_join(zcta_shapes, zip_counts, by = c("GEOID" = "neighborhood"))
 
 
-p <-ggplot(zcta_map) +
+ggplot(zcta_map) +
   geom_sf(aes(fill = count), color = NA) +
   scale_fill_viridis_c(
     option = "plasma",
@@ -347,9 +347,6 @@ p <-ggplot(zcta_map) +
     title = "Participant ZIP Code Distribution"
   ) +
   theme_void()
-
-interactive_map <- ggplotly(p)
-interactive_map
 
 
 

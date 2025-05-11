@@ -2,9 +2,32 @@
 title: "Portfolio 3"
 author: "Cynthia Jiao"
 date: "03/07/2025"
+output: html_document
 ---
 
 I have my full thesis data ready, so I am going to use the analysis/graphs as my portfolio pieces.
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(lme4)
+library(car)
+library(emmeans)
+library(effectsize)
+library(irr)
+library(tidycensus)
+library(lme4)
+library(gtsummary)
+library(ggpubr)
+library(tibble)
+library(sf)
+library(ggplot2)
+
+```
+
+
 
 1. Cleaning & Merging the data sets
 ```{r, echo=FALSE}
@@ -46,7 +69,7 @@ thesis <- thesis %>%
 2. Transforming the variables
 
 In the linear mixed-effect model, choice score of each of the 6 groups will be the outcome variable, and target race, gender, stereotype dimensions, and within-subject variance will be regressed on choice scores. To fit data into the model, I will convert the data to long format. 
-```{r, echo = false}
+```{r, echo = F}
 
 ## creating a composite score for each social group being selected
 
@@ -86,7 +109,7 @@ nice_counts <- count_selections(thesis, nice_cols)
 
 Before fitting the variables into model, I want to first look at the mean score of each group by stereotype dimension so that I can know if there might be salient differences between groups, and more importantly, which race group to choose as the reference group in the model later.
 
-```{r, echo = false}
+```{r, echo = F}
 
 # Add stereotype dimension label
 smart_long <- smart_counts %>%

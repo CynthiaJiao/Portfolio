@@ -2,6 +2,7 @@
 title: "Portfolio 2"
 author: "Cynthia Jiao"
 date: "02/14/2025"
+output: html_document
 ---
 
 For portfolio piece 2, I am using q partial dataset from my recently collected thesis data. My aim for this 2nd piece is to practice how to handle and merge messy data exported from multiple sites (Qualtrics, Google Sheets, etc). 
